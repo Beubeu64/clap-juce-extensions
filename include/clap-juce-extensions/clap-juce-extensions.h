@@ -216,6 +216,21 @@ struct clap_juce_audio_processor_capabilities
 
     virtual bool prefersNoteDialectClap(bool isInput) { return supportsNoteDialectClap(isInput); }
 
+    /*
+     * Override to customize the number of note input/output ports.
+     * Return -1 (the default) to use the standard behavior based on
+     * acceptsMidi()/producesMidi(). Return >= 0 to specify an exact count.
+     */
+    virtual int32_t notePortCountOverride(bool /*isInput*/) { return -1; }
+
+    /*
+     * If notePortCountOverride returns >= 0, the wrapper calls this for each
+     * port index. Fill in the clap_note_port_info and return true on success.
+     * The default returns false (not implemented).
+     */
+    virtual bool notePortInfoOverride(uint32_t /*index*/, bool /*isInput*/,
+                                      clap_note_port_info * /*info*/) { return false; }
+
     // JUCE added support for note names in juce::AudioProcessor
     // in version 8.0.5, but we still allow users to implement
     // CLAP-style note names if they want to.

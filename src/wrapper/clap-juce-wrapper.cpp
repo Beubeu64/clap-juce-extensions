@@ -1054,6 +1054,13 @@ class ClapJuceWrapper : public clap::helpers::Plugin<
     bool implementsNotePorts() const noexcept override { return true; }
     uint32_t notePortsCount(bool is_input) const noexcept override
     {
+        if (processorAsClapExtensions)
+        {
+            int32_t ovr = processorAsClapExtensions->notePortCountOverride(is_input);
+            if (ovr >= 0)
+                return static_cast<uint32_t>(ovr);
+        }
+
         if (is_input)
         {
             if (processor->acceptsMidi())
@@ -1069,6 +1076,12 @@ class ClapJuceWrapper : public clap::helpers::Plugin<
     bool notePortsInfo(uint32_t index, bool is_input,
                        clap_note_port_info *info) const noexcept override
     {
+        if (processorAsClapExtensions &&
+            processorAsClapExtensions->notePortInfoOverride(index, is_input, info))
+        {
+            return true;
+        }
+
         juce::ignoreUnused(index);
 
         if (is_input)
