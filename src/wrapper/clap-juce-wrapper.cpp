@@ -907,13 +907,21 @@ class ClapJuceWrapper : public clap::helpers::Plugin<
     {
         juce::ignoreUnused(minFrameCount);
 
-        if (callLatencyChangeOnNextActivate && _host.canUseLatency()) {
-            _host.latencyChanged();
-            callLatencyChangeOnNextActivate = false;
-        }
+        // Clear the deferred latency-change flag.  The host is expected to
+        // query latencyGet() before/after activate, so calling
+        // _host.latencyChanged() from *inside* activate is both redundant
+        // and harmful (it triggers a restart loop in some hosts like Bitwig).
+        callLatencyChangeOnNextActivate = false;
 
         processor->setRateAndBufferSizeDetails(sampleRate, (int)maxFrameCount);
+
+        // Temporarily disconnect the listener so that setLatencySamples()
+        // inside prepareToPlay does not fire requestRestart() back into the
+        // host while the plugin is being activated.
+        processor->removeListener(this);
         processor->prepareToPlay(sampleRate, (int)maxFrameCount);
+        processor->addListener(this);
+
         midiBuffer.ensureSize(2048);
         midiBuffer.clear();
 
@@ -2444,7 +2452,16 @@ class ClapJuceWrapper : public clap::helpers::Plugin<
 
         // JUCE has no way to report an unstream error; setStateInformation is void
         // So we just have to assume it works.
+        //
+        // Temporarily disconnect the AudioProcessorListener to prevent
+        // requestRestart() / paramsRequestFlush() calls into the host during
+        // state restoration.  JUCE's replaceState fires setValueNotifyingHost
+        // for every parameter, plus setLatencySamples may change; none of these
+        // should reach the host while the plugin is still being initialised.
+        // The host will query latencyGet() and paramsValue() at activate-time.
+        processor->removeListener(this);
         processor->setStateInformation(chunkMemory.getData(), (int)chunkMemory.getSize());
+        processor->addListener(this);
         chunkMemory.reset();
         return true;
     }
